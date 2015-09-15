@@ -1,0 +1,19 @@
+name:                slack-lambdabot-heroku
+version:             0.1.0.0
+synopsis:            lambdabot for Slack on Heroku
+description:         lambdabot for Slack on Heroku
+license-file:        LICENSE
+author:              Mark Andrus Roberts
+maintainer:          markandrusroberts@gmail.com
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+executable slack-lambdabot-heroku
+  main-is:             src/Main.hs
+  build-depends:       base >=4.8 && <4.9,
+                       djinn ==2014.9.7,
+                       lambdabot ==5.0.3
+  constraint:          transformers installed
+  hs-source-dirs:      src
+  default-language:    Haskell2010
