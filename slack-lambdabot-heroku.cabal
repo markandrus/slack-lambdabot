@@ -12,7 +12,7 @@ executable slack-lambdabot-heroku
   main-is:             Main.hs
   other-modules:       Modules
   hs-source-dirs:      src
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.7 && <4.9,
                        html-entities ==1.1.0.0,
                        lambdabot-core ==5.0.3,
                        lambdabot-haskell-plugins ==5.0.3,
