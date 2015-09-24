@@ -13,7 +13,6 @@ import Data.Text (Text, dropWhile, filter, pack, unpack, stripPrefix)
 import Data.Text.Lazy (toStrict)
 import Data.Text.Lazy.Builder (toLazyText)
 import HTMLEntities.Decoder (htmlEncodedText)
--- import qualified HTMLEntities.Builder as HTMLEncoded
 import Lambdabot.Main
 import Modules (modulesInfo)
 import Prelude hiding (dropWhile, filter)
@@ -30,34 +29,9 @@ import Web.Slack.Message (sendMessage)
 -- | Run one or more commands against Lambdabot and capture the response.
 lambdabot :: Text -> IO String
 lambdabot command = do
-  let request = void $ lambdabotMain modulesInfo
-        [onStartupCmds :=> [unpack command]]
+  let request = void $ lambdabotMain modulesInfo [onStartupCmds :=> [unpack command]]
   (response, _) <- capture request
   return response
-
--- Commented out below is how I might rewrite the lambdabot function. Lambdabot
--- itself is kind of kludgy when it comes to package management, etc. Maybe we
--- should just use mueval?
-{-
-lambdabot :: Text -> IO (Maybe String)
-lambdabot (stripPrefix "t "     -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix ":t "    -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix "?t "    -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix "@t "    -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix "type "  -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix ":type " -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix "?type " -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix "@type " -> Just expr) = Just <$> lambdabotType expr
-lambdabot (stripPrefix "> "     -> Just expr) = Just <$> lambdabotEval expr
-lambdabot (stripPrefix "run "   -> Just expr) = Just <$> lambdabotEval expr
-lambdabot (stripPrefix "?run "  -> Just expr) = Just <$> lambdabotEval expr
-lambdabot (stripPrefix "@run "  -> Just expr) = Just <$> lambdabotEval expr
-lambdabot expr = Just <$> lambdabotEval expr
-lambdabot _ = return Nothing
-
-lambdabotType :: Text -> IO (Maybe String)
-lambdabotType = id
--}
 
 -------------------------------------------------------------------------------
 -- Slack
@@ -96,9 +70,6 @@ slackBot (Message cid _ someMessage _ _ _) = do
       let response = "```\n" <> rawResponse <> "```"
       sendMessage cid response
 slackBot _ = return ()
-
--- encodeHtml :: Text -> Text
--- encodeHtml = toStrict . toLazyText . HTMLEncoded.text
 
 decodeHtml :: Text -> Text
 decodeHtml = toStrict . toLazyText . htmlEncodedText
