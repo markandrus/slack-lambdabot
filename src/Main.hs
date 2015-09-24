@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Main (main) where
 
@@ -27,11 +28,36 @@ import Web.Slack.Message (sendMessage)
 -------------------------------------------------------------------------------
 
 -- | Run one or more commands against Lambdabot and capture the response.
-lambdabot :: [String] -> IO String
-lambdabot strs = do
-  let request = void $ lambdabotMain modulesInfo [onStartupCmds :=> strs]
+lambdabot :: Text -> IO String
+lambdabot command = do
+  let request = void $ lambdabotMain modulesInfo
+        [onStartupCmds :=> [unpack command]]
   (response, _) <- capture request
   return response
+
+-- Commented out below is how I might rewrite the lambdabot function. Lambdabot
+-- itself is kind of kludgy when it comes to package management, etc. Maybe we
+-- should just use mueval?
+{-
+lambdabot :: Text -> IO (Maybe String)
+lambdabot (stripPrefix "t "     -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix ":t "    -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix "?t "    -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix "@t "    -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix "type "  -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix ":type " -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix "?type " -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix "@type " -> Just expr) = Just <$> lambdabotType expr
+lambdabot (stripPrefix "> "     -> Just expr) = Just <$> lambdabotEval expr
+lambdabot (stripPrefix "run "   -> Just expr) = Just <$> lambdabotEval expr
+lambdabot (stripPrefix "?run "  -> Just expr) = Just <$> lambdabotEval expr
+lambdabot (stripPrefix "@run "  -> Just expr) = Just <$> lambdabotEval expr
+lambdabot expr = Just <$> lambdabotEval expr
+lambdabot _ = return Nothing
+
+lambdabotType :: Text -> IO (Maybe String)
+lambdabotType = id
+-}
 
 -------------------------------------------------------------------------------
 -- Slack
@@ -54,7 +80,8 @@ getMessageForMe :: Text -> Slack a (Maybe Text)
 getMessageForMe message = do
   myId <- use $ session . slackSelf . selfUserId . getId
   let atMyId = "<@" <> myId <> ">"
-  return $ dropWhile (== ':') <$> stripPrefix atMyId message
+  return $  dropWhile (\c -> c == ':' || c == ' ')
+        <$> stripPrefix atMyId message
 
 -- | Construct a @SlackBot@ from a name. This bot will pass messages addressed
 -- to it to 'lambdabot' and relay 'lambdabot''s response.
@@ -65,7 +92,7 @@ slackBot (Message cid _ someMessage _ _ _) = do
     Nothing -> return ()
     Just message -> do
       let request = filter (/= '`') $ decodeHtml message
-      rawResponse <- liftIO (pack . decodeString <$> lambdabot [unpack request])
+      rawResponse <- liftIO (pack . decodeString <$> lambdabot request)
       let response = "```\n" <> rawResponse <> "```"
       sendMessage cid response
 slackBot _ = return ()
