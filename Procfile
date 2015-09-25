@@ -1,1 +1,1 @@
-web: bin/slack-lambdabot-heroku
+web: bin/slack-lambdabot

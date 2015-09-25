@@ -1,14 +1,14 @@
-name:                slack-lambdabot-heroku
+name:                slack-lambdabo-
 version:             0.1.0.0
-synopsis:            lambdabot for Slack on Heroku
-description:         lambdabot for Slack on Heroku
+synopsis:            Lambdabot for Slack
+description:         Lambdabot for Slack
 author:              Mark Andrus Roberts
 maintainer:          markandrusroberts@gmail.com
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
-executable slack-lambdabot-heroku
+executable slack-lambdabot
   main-is:             Main.hs
   other-modules:       Modules
   hs-source-dirs:      src
@@ -23,7 +23,6 @@ executable slack-lambdabot-heroku
                        lambdabot-social-plugins ==5.0.1,
                        lambdabot-trusted ==5.0.2.1,
                        lens ==4.13,
-                       mueval ==0.9.1.1.2,
                        silently ==1.2.5,
                        slack-api ==0.5,
                        text ==1.2.1.3,

@@ -1,13 +1,10 @@
 {
-  "name": "slack-lambdabot-heroku",
-  "description": "lambdabot for Slack on Heroku",
+  "name": "slack-lambdabot",
+  "description": "Lambdabot for Slack",
   "env": {
     "BUILDPACK_URL": {
       "description": "Heroku buildpack for deploying Haskell apps",
       "value": "https://github.com/mietek/haskell-on-heroku"
     }
-  },
-  "scripts": {
-    "postdeploy": "hoogle data"
   }
 }
