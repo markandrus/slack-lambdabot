@@ -1,1 +1,1 @@
-web: bin/slack-lambdabot
+worker: bin/slack-lambdabot
