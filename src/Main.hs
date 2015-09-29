@@ -1,35 +1,125 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Main (main) where
 
 import Codec.Binary.UTF8.String (decodeString)
-import Control.Lens (use)
+import Control.Applicative ((<|>))
+import Control.DeepSeq (NFData)
+import Control.Lens ((^.), Getter, to, use)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Functor (void)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Monoid ((<>))
-import Data.Text (Text, dropWhile, filter, pack, unpack, stripPrefix)
+import Data.Text (Text, dropWhile, pack, unpack, stripPrefix)
 import Data.Text.Lazy (toStrict)
 import Data.Text.Lazy.Builder (toLazyText)
+import GHC.Generics (Generic)
 import HTMLEntities.Decoder (htmlEncodedText)
 import Lambdabot.Main
 import Modules (modulesInfo)
 import Prelude hiding (dropWhile, filter)
 import System.Environment (lookupEnv)
 import System.IO.Silently (capture)
+import Text.Parsec (anyChar, char, eof, many, optional, parse, skipMany,
+  skipMany1, space, string)
+import Text.Parsec.Text (Parser)
 import Web.Slack (Event(Message), Slack, SlackBot, SlackConfig(..), getId,
   runBot, selfUserId, session, slackSelf)
 import Web.Slack.Message (sendMessage)
+
+-------------------------------------------------------------------------------
+-- Command
+-------------------------------------------------------------------------------
+
+-- | A 'Command' contains a Haskell expression our 'lambdabot' can evaluate.
+data Command where
+  Eval :: !Text -> Command
+  Type :: !Text -> Command
+  deriving (Eq, Generic, NFData, Ord, Read, Show)
+
+-- | View the Haskell expression inside of a 'Command'.
+expression :: Getter Command Text
+expression = to $ \case
+  Eval expression' -> expression'
+  Type expression' -> expression'
+
+-- TODO(mroberts): Remove me.
+prefix :: Getter Command Text
+prefix = to $ \case
+  Eval _ -> "eval"
+  Type _ -> "type"
+
+-- | Parse a 'Command'.
+parseCommand :: Parser Command
+parseCommand = parseEval <|> parseType where
+
+  -- | Parse an 'Eval' 'Command'.
+  parseEval :: Parser Command
+  parseEval
+    =  skipMany space
+    *> optional parsePrefix
+    *> (string ">"
+   <|>  string "eval"
+   <|>  string "run")
+    *> skipMany1 space
+    *> (Eval . pack <$> parseCode)
+   <*  skipMany space
+   <*  eof
+
+  -- | Parse a 'Type' 'Command'.
+  parseType :: Parser Command
+  parseType
+    =  skipMany space
+    *> optional parsePrefix
+    *> (string "t"
+   <|>  string "type")
+    *> skipMany1 space
+    *> (Type . pack <$> parseCode)
+   <*  skipMany space
+   <*  eof
+
+  parsePrefix :: Parser Char
+  parsePrefix = char ':' <|> char '?' <|> char '@'
+
+  -- | Attempt to parse a code block surrounded in @```@. If that does not
+  -- work, attempt to parse inline code surrounded in @`@. Finally, if that
+  -- does not work, just treat the whole string as code.
+  parseCode :: Parser String
+  parseCode = parseCodeBlock <|> parseInlineCode <|> anyString where
+
+    -- | Parses a code block surrounded in @```@.
+    parseCodeBlock :: Parser String
+    parseCodeBlock
+      =  string "```\n"
+      *> anyString
+     <*  string "```\n"
+
+    -- | Parses inline code surrounded in @`@.
+    parseInlineCode :: Parser String
+    parseInlineCode
+      =  char '`'
+      *> anyString
+     <*  char '`'
+
+    -- | Parse any string.
+    anyString :: Parser String
+    anyString = many anyChar
 
 -------------------------------------------------------------------------------
 -- Lambdabot
 -------------------------------------------------------------------------------
 
 -- | Run one or more commands against Lambdabot and capture the response.
-lambdabot :: Text -> IO String
+lambdabot :: Command -> IO String
 lambdabot command = do
-  let request = void $ lambdabotMain modulesInfo [onStartupCmds :=> [unpack command]]
+  let request = void $ lambdabotMain modulesInfo
+        [onStartupCmds :=> [unpack $ (command ^. prefix) <> " " <> (command ^. expression)]]
   (response, _) <- capture request
   return response
 
@@ -62,11 +152,14 @@ getMessageForMe message = do
 slackBot :: SlackBot a
 slackBot (Message cid _ someMessage _ _ _) = do
   messageForMe <- getMessageForMe someMessage
-  case messageForMe of
-    Nothing -> return ()
-    Just message -> do
-      let request = filter (/= '`') $ decodeHtml message
-      rawResponse <- liftIO (pack . decodeString <$> lambdabot request)
+  let shouldReportParseError = isJust messageForMe
+  let message = fromMaybe someMessage messageForMe
+  let parsedCommand = parse parseCommand "" $ decodeHtml message
+  case parsedCommand of
+    Left error' ->
+      when shouldReportParseError . sendMessage cid . pack $ show error'
+    Right command -> do
+      rawResponse <- liftIO (pack . decodeString <$> lambdabot command)
       let response = "```\n" <> rawResponse <> "```"
       sendMessage cid response
 slackBot _ = return ()

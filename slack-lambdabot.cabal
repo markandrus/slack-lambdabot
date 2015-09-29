@@ -13,6 +13,7 @@ executable slack-lambdabot
   other-modules:       Modules
   hs-source-dirs:      src
   build-depends:       base >=4.7 && <4.9,
+                       deepseq ==1.4.1.1,
                        html-entities ==1.1.0.0,
                        lambdabot-core ==5.0.3,
                        lambdabot-haskell-plugins ==5.0.3,
@@ -23,6 +24,7 @@ executable slack-lambdabot
                        lambdabot-social-plugins ==5.0.1,
                        lambdabot-trusted ==5.0.2.1,
                        lens ==4.13,
+                       parsec ==3.1.9,
                        silently ==1.2.5,
                        slack-api ==0.6,
                        text ==1.2.1.3,
