@@ -26,8 +26,8 @@ import Modules (modulesInfo)
 import Prelude hiding (dropWhile, filter)
 import System.Environment (lookupEnv)
 import System.IO.Silently (capture)
-import Text.Parsec (anyChar, char, eof, many, optional, parse, skipMany,
-  skipMany1, space, string)
+import Text.Parsec (anyChar, between, char, eof, many, noneOf, oneOf, optional,
+  parse, skipMany, skipMany1, space, string, try)
 import Text.Parsec.Text (Parser)
 import Web.Slack (Event(Message), Slack, SlackBot, SlackConfig(..), getId,
   runBot, selfUserId, session, slackSelf)
@@ -57,55 +57,55 @@ prefix = to $ \case
 
 -- | Parse a 'Command'.
 parseCommand :: Parser Command
-parseCommand = parseEval <|> parseType where
+parseCommand = try parseEval <|> parseType where
 
   -- | Parse an 'Eval' 'Command'.
   parseEval :: Parser Command
   parseEval
-    =  skipMany space
+    =  skipMany spaceOrNewline
     *> optional parsePrefix
-    *> (string ">"
-   <|>  string "eval"
-   <|>  string "run")
-    *> skipMany1 space
+    *> (try (string ">")
+   <|>  try (string "eval")
+   <|>       string "run")
+    *> skipMany1 spaceOrNewline
     *> (Eval . pack <$> parseCode)
-   <*  skipMany space
+   <*  skipMany spaceOrNewline
    <*  eof
 
   -- | Parse a 'Type' 'Command'.
   parseType :: Parser Command
   parseType
-    =  skipMany space
+    =  skipMany spaceOrNewline
     *> optional parsePrefix
-    *> (string "t"
-   <|>  string "type")
-    *> skipMany1 space
+    *> (try (string "type")
+   <|>       string "t")
+    *> skipMany1 spaceOrNewline
     *> (Type . pack <$> parseCode)
-   <*  skipMany space
+   <*  skipMany spaceOrNewline
    <*  eof
 
   parsePrefix :: Parser Char
-  parsePrefix = char ':' <|> char '?' <|> char '@'
+  parsePrefix
+    =  try (char ':')
+   <|> try (char '?')
+   <|>      char '@'
+
+  spaceOrNewline :: Parser Char
+  spaceOrNewline = oneOf " \n"
 
   -- | Attempt to parse a code block surrounded in @```@. If that does not
   -- work, attempt to parse inline code surrounded in @`@. Finally, if that
   -- does not work, just treat the whole string as code.
   parseCode :: Parser String
-  parseCode = parseCodeBlock <|> parseInlineCode <|> anyString where
+  parseCode = try parseCodeBlock <|> try parseInlineCode <|> anyString where
 
     -- | Parses a code block surrounded in @```@.
     parseCodeBlock :: Parser String
-    parseCodeBlock
-      =  string "```\n"
-      *> anyString
-     <*  string "```\n"
+    parseCodeBlock = between (string "```\n") (string "```") (many $ noneOf "`")
 
     -- | Parses inline code surrounded in @`@.
     parseInlineCode :: Parser String
-    parseInlineCode
-      =  char '`'
-      *> anyString
-     <*  char '`'
+    parseInlineCode = between (char '`') (char '`') (many $ noneOf "`")
 
     -- | Parse any string.
     anyString :: Parser String
@@ -157,7 +157,8 @@ slackBot (Message cid _ someMessage _ _ _) = do
   let parsedCommand = parse parseCommand "" $ decodeHtml message
   case parsedCommand of
     Left error' ->
-      when shouldReportParseError . sendMessage cid . pack $ show error'
+      -- when shouldReportParseError . sendMessage cid . pack $ show error'
+      sendMessage cid . pack $ show error'
     Right command -> do
       rawResponse <- liftIO (pack . decodeString <$> lambdabot command)
       let response = "```\n" <> rawResponse <> "```"
