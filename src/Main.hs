@@ -11,10 +11,9 @@ import Codec.Binary.UTF8.String (decodeString)
 import Control.Applicative ((<|>))
 import Control.DeepSeq (NFData)
 import Control.Lens ((^.), Getter, to, use)
-import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Functor (void)
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text, dropWhile, pack, unpack, stripPrefix)
 import Data.Text.Lazy (toStrict)
@@ -27,7 +26,7 @@ import Prelude hiding (dropWhile, filter)
 import System.Environment (lookupEnv)
 import System.IO.Silently (capture)
 import Text.Parsec (anyChar, between, char, eof, many, noneOf, oneOf, optional,
-  parse, skipMany, skipMany1, space, string, try)
+  parse, skipMany, skipMany1, string, try)
 import Text.Parsec.Text (Parser)
 import Web.Slack (Event(Message), Slack, SlackBot, SlackConfig(..), getId,
   runBot, selfUserId, session, slackSelf)
@@ -152,7 +151,7 @@ getMessageForMe message = do
 slackBot :: SlackBot a
 slackBot (Message cid _ someMessage _ _ _) = do
   messageForMe <- getMessageForMe someMessage
-  let shouldReportParseError = isJust messageForMe
+  -- let shouldReportParseError = isJust messageForMe
   let message = fromMaybe someMessage messageForMe
   let parsedCommand = parse parseCommand "" $ decodeHtml message
   case parsedCommand of
