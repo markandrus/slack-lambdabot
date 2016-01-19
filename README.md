@@ -10,10 +10,7 @@ Building
 Clone the repo and run
 
 ```
-cabal sandbox init
-cabal install --dependencies-only
-cabal configure
-cabal build
+stack build
 ```
 
 ### OS X
@@ -25,11 +22,6 @@ extra include directory. For example, using [Homebrew](http://brew.sh):
 brew install pcre
 ```
 
-Then, the install command above becomes
-
-```
-cabal install --dependencies-only --extra-include-dirs /usr/local/include
-```
 
 Running
 -------
